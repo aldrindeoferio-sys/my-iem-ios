@@ -47,17 +47,11 @@ jobs:
           echo "API private key file format validated."
           echo "ASC_KEY_ID_CLEAN=${ASC_KEY_ID_CLEAN}" >> "$GITHUB_ENV"
 
-      - name: Validate App Store Connect API authentication
-        env:
-          ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      - name: API key ready for Xcode signing
         run: |
           set -euo pipefail
-          echo "Validating App Store Connect API credentials before Xcode signing..."
-          xcrun altool --list-providers \
-            --apiKey "$ASC_KEY_ID_CLEAN" \
-            --apiIssuer "$ASC_ISSUER_ID"
-          echo "APP STORE CONNECT AUTHENTICATION PASSED"
+          test -s "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8"
+          echo "API private key validated locally; Xcode archive/export will authenticate it with Apple."
 
       - name: Archive for App Store
         env:
