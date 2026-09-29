@@ -6,9 +6,17 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify Xcode 26+
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          XCODE_MAJOR="$(xcodebuild -version | awk '/Xcode/{split($2,v,"."); print v[1]}')"
+          test "$XCODE_MAJOR" -ge 26
+          echo "Xcode requirement passed."
 
       - name: Install XcodeGen
         run: brew install xcodegen
