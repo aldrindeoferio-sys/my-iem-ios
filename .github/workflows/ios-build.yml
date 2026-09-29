@@ -25,11 +25,19 @@ jobs:
           ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
         run: |
           set -euo pipefail
+          # Strip accidental CR/LF/space from the Key ID so the filename is exact.
+          ASC_KEY_ID_CLEAN="$(printf '%s' "$ASC_KEY_ID" | tr -d '\r\n[:space:]')"
           test -n "$ASC_PRIVATE_KEY"
-          test -n "$ASC_KEY_ID"
+          test -n "$ASC_KEY_ID_CLEAN"
           mkdir -p "$HOME/private_keys"
-          printf '%s\n' "$ASC_PRIVATE_KEY" > "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-          chmod 600 "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          # Normalize Windows CRLF if the multiline .p8 was pasted from Notepad.
+          printf '%s' "$ASC_PRIVATE_KEY" | tr -d '\r' > "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8"
+          chmod 600 "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8"
+          grep -q -- '-----BEGIN PRIVATE KEY-----' "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8"
+          grep -q -- '-----END PRIVATE KEY-----' "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8"
+          openssl pkey -in "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8" -noout -check
+          echo "API private key file format validated."
+          echo "ASC_KEY_ID_CLEAN=${ASC_KEY_ID_CLEAN}" >> "$GITHUB_ENV"
 
       - name: Validate App Store Connect API authentication
         env:
@@ -39,7 +47,7 @@ jobs:
           set -euo pipefail
           echo "Validating App Store Connect API credentials before Xcode signing..."
           xcrun altool --list-providers \
-            --apiKey "$ASC_KEY_ID" \
+            --apiKey "$ASC_KEY_ID_CLEAN" \
             --apiIssuer "$ASC_ISSUER_ID"
           echo "APP STORE CONNECT AUTHENTICATION PASSED"
 
@@ -56,8 +64,8 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/MYIEM.xcarchive" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             archive
 
@@ -92,8 +100,8 @@ jobs:
             -exportPath "$RUNNER_TEMP/export" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${ASC_KEY_ID_CLEAN}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Upload to TestFlight
@@ -107,11 +115,11 @@ jobs:
           xcrun altool --upload-app \
             --type ios \
             --file "$IPA" \
-            --apiKey "$ASC_KEY_ID" \
+            --apiKey "$ASC_KEY_ID_CLEAN" \
             --apiIssuer "$ASC_ISSUER_ID"
 
       - name: Remove API key
         if: always()
         env:
           ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-        run: rm -f "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+        run: rm -f "$HOME/private_keys"/AuthKey_*.p8
