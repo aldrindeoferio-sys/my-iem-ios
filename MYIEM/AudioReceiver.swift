@@ -123,7 +123,7 @@ final class AudioReceiver: ObservableObject {
             let ms=Double(la.duration(to:now).components.attoseconds)/1e15
             let expectedMs=Double(frames)/rate*1000
             let deviation=abs(ms-expectedMs)
-            jitterEWMA=jitterEWMA*.94+deviation*.06
+            jitterEWMA = jitterEWMA * 0.94 + deviation * 0.06
             jitterMs=jitterEWMA
             // SonoBus-inspired principle: adapt gently, bounded for IEM use.
             targetMs=min(45,max(18,18+jitterEWMA*2.2))
@@ -138,7 +138,7 @@ final class AudioReceiver: ObservableObject {
     }
 
     private func drain(){
-        guard var e=expected else{return}
+        guard let e=expected else{return}
         let outstanding=max(0,queuedFrames-playedFrames)
         let currentMs=Double(outstanding)/rate*1000
         bufferMs=currentMs;maxBufferMs=max(maxBufferMs,currentMs)
